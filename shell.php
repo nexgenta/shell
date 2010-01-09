@@ -63,12 +63,17 @@ class Shell extends CommandLine
 				break;
 			}
 			Error::$throw = true;		
-			$req = new CLIRequest();
-			$req->init();
+			$req = Request::requestForSAPI('cli');
 			$req->params = $cmd;
 			try
 			{
-				$router->process($req);
+				try
+				{
+					$router->process($req);
+				}
+				catch(TerminalErrorException $ex)
+				{
+				}
 			}
 			catch(Exception $e)
 			{
@@ -127,6 +132,9 @@ class ShellRouter extends DefaultApp
 			'cd' => array('class' => 'ShellChdir', 'name' => 'shell', 'file' => 'utils.php', 'description' => 'Change the current working directory'),
 			'pwd' => array('class' => 'ShellPwd', 'name' => 'shell', 'file' => 'utils.php', 'description' => 'Show the current working directory'),
 			'mkdir' => array('class' => 'ShellMkdir', 'name' => 'shell', 'file' => 'utils.php', 'description' => 'Create a directory'),
+			'stat' => array('class' => 'ShellStat', 'name' => 'shell', 'file' => 'utils.php', 'description' => 'Display filesystem metadata associated with a file'),
+			'cat' => array('class' => 'ShellCat', 'name' => 'shell', 'file' => 'utils.php', 'description' => 'Concatenate one or more input files into a single output file'),
+			'cp' => array('class' => 'ShellCp', 'name' => 'shell', 'file' => 'utils.php', 'description' => 'Copy files from one location to another'),
 		);
 		$this->sapi['cli'] = array_merge($shelltools, $this->sapi['cli']);
 	}

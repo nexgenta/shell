@@ -29,6 +29,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+uses('url');
+
 class ShellLs extends CommandLine
 {
 	protected $onePerLine;
@@ -111,12 +113,13 @@ class ShellLs extends CommandLine
 		{
 			case 0140000: $str = 's'; break;
 			case 0120000: $str = 'l'; break;
+			case 0100000: $str = '-'; break;
 			case 0060000: $str = 'b'; break;
 			case 0040000: $str = 'd'; break;
 			case 0020000: $str = 'c'; break;
 			case 0010000: $str = 'p'; break;
 			default:
-				$str = '-';
+				$str = '?';
 		}
 		$str .= (($mode&0x0100) ? 'r' : '-' ) . (($mode&0x0080) ? 'w':'-');
 		$str .= (($mode&0x0040) ? (($mode&0x0800) ?'s':'x'):(($mode&0x0800)?'S':'-'));
@@ -130,10 +133,12 @@ class ShellLs extends CommandLine
 	
 	protected function listPath($path)
 	{
+		$path = URL::realpath($path);
 		if(!($d = opendir($path)))
 		{
 			return false;
 		}
+		if(substr($path, -1) != '/') $path .= '/';
 		$entries = array();
 		$maxuid = 0;
 		$maxgid = 0;
@@ -142,9 +147,10 @@ class ShellLs extends CommandLine
 		$maxname = 0;
 		while(($entry = readdir($d)))
 		{
+			$epath = $path . $entry;
 			if(!$this->allExceptDotDirs && !$this->all && $entry[0] == '.') continue;
 			if(!$this->all && (!strcmp($entry, '.') || !strcmp($entry, '..'))) continue;
-			if(!($stat = lstat($path . '/' . $entry))) continue;
+			if(!($stat = lstat($epath))) continue;
 			$mode = intval($stat['mode'], 8);
 			$name = $entry;
 			if($this->typeIndicators)
@@ -176,7 +182,7 @@ class ShellLs extends CommandLine
 				);
 				if(($mode & 0120000) == 0120000)
 				{
-					$e['suffix'] = ' -> ' . readlink($path . '/' . $entry);
+					$e['suffix'] = ' -> ' . URL::readlink($epath);
 				}
 				if(($l = strlen($e['uid'])) > $maxuid) $maxuid = $l;
 				if(($l = strlen($e['gid'])) > $maxgid) $maxgid = $l;
@@ -234,7 +240,7 @@ class ShellMkdir extends CommandLine
 		if(!(parent::checkargs($args))) return false;
 		if(!count($args))
 		{
-			return $this->error(Error::NO_OBJECT_SPECIFIED, null, null, 'Usage: mkdir [OPTIONS] PATH [PATH...]');
+			return $this->error(Error::NO_OBJECT, null, null, 'Usage: mkdir [OPTIONS] PATH [PATH...]');
 		}
 		return true;
 	}
@@ -249,3 +255,81 @@ class ShellMkdir extends CommandLine
 		return $err == 0 ? 0 : 1;
 	}
 }
+
+class ShellStat extends CommandLine
+{
+	protected function checkargs(&$args)
+	{
+		if(!(parent::checkargs($args))) return false;
+		if(count($args) != 1)
+		{
+			return $this->error(Error::NO_OBJECT, null, null, 'Usage: stat PATH');
+		}
+		return true;
+	}
+	
+	public function main($args)
+	{
+		if(!($info = stat($args[0])))
+		{
+			return 1;
+		}
+		foreach($info as $k => $v)
+		{
+			if(is_numeric($k)) continue;
+			echo $k . ': ' . $v . "\n";
+		}
+		return 0;		
+	}
+}
+
+class ShellCat extends CommandLine
+{
+	protected function checkargs(&$args)
+	{
+		if(!(parent::checkargs($args))) return false;
+		if(!count($args))
+		{
+			return $this->error(Error::NO_OBJECT, null, null, 'Usage: cat [OPTIONS] PATH [PATH...]');
+		}
+		return true;
+	}
+	
+	public function main($args)
+	{
+		$err = 0;
+		foreach($args as $path)
+		{
+			if(!readfile($path))
+			{
+				$err++;
+			}
+			flush();
+		}
+		return $err == 0 ? 0 : 1;
+	}
+}
+
+class ShellCp extends CommandLine
+{
+	protected function checkargs(&$args)
+	{
+		if(!(parent::checkargs($args))) return false;
+		if(count($args) != 2)
+		{
+			return $this->error(Error::NO_OBJECT, null, null, 'Usage: cp [OPTIONS] SOURCE-URL DEST-URL');
+		}
+		return true;
+	}
+	
+	public function main($args)
+	{
+		uses('urlcopy');
+		if(!urlcopy($args[0], $args[1]))
+		{
+			return 1;
+		}
+		return 0;
+	}
+}
+
